@@ -4,8 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Any, TypedDict
 
-from aiohttp import BasicAuth
-from aiohttp.client_exceptions import ClientError
+from dutycalls import Client
+from dutycalls.errors import DutyCallsAuthError, DutyCallsRequestError
 import voluptuous as vol
 
 from homeassistant.components.notify import (
@@ -16,7 +16,7 @@ from homeassistant.components.notify import (
     BaseNotificationService,
 )
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.helpers import aiohttp_client, config_validation as cv
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import (
     ConfigType,
     DiscoveryInfoType,
@@ -32,8 +32,6 @@ ATTR_LINK = "link"
 ATTR_IDENTIFIER = "identifier"
 
 CONF_DEFAULT_CHANNEL = "default_channel"
-
-BASE_URL = "https://dutycalls.me/api/ticket?"
 
 DATA_TEXT_ONLY_SCHEMA = vol.Schema(
     {
@@ -76,12 +74,8 @@ async def async_get_service(
     """Set up the DutyCalls notification service."""
 
     try:
-        return DutyCallsNotificationService(
-            hass,
-            config[CONF_DEFAULT_CHANNEL],
-            config[CONF_USERNAME],
-            config[CONF_PASSWORD],
-        )
+        client = Client(login=config[CONF_USERNAME], password=config[CONF_PASSWORD])
+        return DutyCallsNotificationService(hass, config[CONF_DEFAULT_CHANNEL], client)
     except RuntimeError as err:
         _LOGGER.exception("Error in creating a new DutyCalls ticket: %s", err)
         return None
@@ -91,17 +85,12 @@ class DutyCallsNotificationService(BaseNotificationService):
     """Implement the notification service for DutyCalls."""
 
     def __init__(
-        self,
-        hass: HomeAssistantType,
-        default_channel: str,
-        username: str,
-        password: str,
+        self, hass: HomeAssistantType, default_channel: str, client: Client
     ) -> None:
         """Initialize."""
         self._hass = hass
         self._default_channel = default_channel
-        self._username = username
-        self._password = password
+        self._client = client
 
     async def _async_post_ticket(
         self,
@@ -133,20 +122,11 @@ class DutyCallsNotificationService(BaseNotificationService):
         if identifier:
             ticket_dict["identifier"] = identifier
 
-        url = BASE_URL
-
-        for idx, target in enumerate(targets):
-            if idx == 0:
-                url = url + "channel=" + target
-            else:
-                url = url + "&channel=" + target
-
-        session = aiohttp_client.async_get_clientsession(self._hass)
         try:
-            await session.post(
-                url, auth=BasicAuth(self._username, self._password), json=ticket_dict
-            )
-        except ClientError as err:
+            await self._client.new_ticket(ticket_dict, *targets)
+        except DutyCallsAuthError as err:
+            _LOGGER.error("Error while posting the ticket: %r", err)
+        except DutyCallsRequestError as err:
             _LOGGER.error("Error while posting the ticket: %r", err)
 
     async def async_send_message(self, message: str, **kwargs: Any) -> None:
