@@ -1,0 +1,8 @@
+{
+  "domain": "dutycalls",
+  "name": "DutyCalls",
+  "documentation": "https://www.home-assistant.io/integrations/dutycalls",
+  "dependencies": [],
+  "codeowners": ["@robbm1"],
+  "requirements": ["dutycalls-sdk==0.1.2"]
+}

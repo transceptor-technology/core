@@ -208,6 +208,7 @@ omit =
     homeassistant/components/dunehd/__init__.py
     homeassistant/components/dunehd/const.py
     homeassistant/components/dunehd/media_player.py
+    homeassistant/components/dutycalls/notify.py
     homeassistant/components/dwd_weather_warnings/sensor.py
     homeassistant/components/dweet/*
     homeassistant/components/ebox/sensor.py
